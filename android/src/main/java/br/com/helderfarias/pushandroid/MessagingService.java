@@ -3,12 +3,12 @@ package br.com.helderfarias.pushandroid;
 import java.util.Map;
 import java.util.Set;
 
+import android.content.ComponentName;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 
-import com.facebook.react.bridge.Arguments;
-import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.HeadlessJsTaskService;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
@@ -17,6 +17,7 @@ import org.json.JSONObject;
 
 import br.com.helderfarias.pushandroid.helpers.ConverterHelper;
 import br.com.helderfarias.pushandroid.helpers.NotificationHelper;
+import br.com.helderfarias.pushandroid.helpers.SharedHelper;
 
 public class MessagingService extends FirebaseMessagingService {
 
@@ -26,10 +27,36 @@ public class MessagingService extends FirebaseMessagingService {
     public void onMessageReceived(RemoteMessage remoteMessage) {
         Log.d(TAG, "Remote message received");
 
-        Intent i = new Intent(Constants.INTENT_RECEIVE_REMOTE_NOTIFICATION);
-        i.putExtra("data", remoteMessage);
-        buildLocalNotification(remoteMessage);
-        sendOrderedBroadcast(i, null);
+        //  |-> ---------------------
+        //      App in Foreground
+        //   ------------------------
+        if (SharedHelper.isAppInForeground(getApplicationContext())) {
+            buildLocalNotification(remoteMessage);
+            
+            Intent i = new Intent(Constants.INTENT_RECEIVE_REMOTE_NOTIFICATION);
+            i.putExtra("data", remoteMessage);
+            sendOrderedBroadcast(i, null);
+
+            return;
+        }
+
+        //  |-> ---------------------
+        //    App in Background/Quit
+        //   ------------------------
+        try {
+            Intent intent = new Intent(getApplicationContext(), FirebaseMessagingHeadlessService.class);
+            intent.putExtra("message", remoteMessage);
+            ComponentName name = getApplicationContext().startService(intent);
+            if (name != null) {
+                HeadlessJsTaskService.acquireWakeLockNow(getApplicationContext());
+            }
+        } catch (IllegalStateException ex) {
+            Log.e(
+                    TAG,
+                    "Background messages only work if the message priority is set to 'high'",
+                    ex
+            );
+        }
     }
 
     public void buildLocalNotification(RemoteMessage remoteMessage) {

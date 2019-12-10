@@ -1,6 +1,6 @@
-
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="br.com.helderfarias.pushandroid">
-
+    <application>
+        <service android:name="br.com.helderfarias.pushandroid.FirebaseMessagingHeadlessService" />
+    </application>
 </manifest>
-  
